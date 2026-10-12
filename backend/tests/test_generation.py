@@ -134,3 +134,44 @@ def test_ollama_generator_removes_thinking_text(
         OllamaGenerator().generate("prompt")
         == "The project is a rectangle calculator."
     )
+
+
+def test_openai_compatible_generator_sends_chat_completion_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request: dict[str, object] = {}
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {"choices": [{"message": {"content": "A concise answer."}}]}
+
+    def fake_post(*args: object, **kwargs: object) -> Response:
+        request.update(kwargs)
+        return Response()
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    from app.generation.service import OpenAICompatibleGenerator
+
+    generator = OpenAICompatibleGenerator(
+        base_url="https://provider.example/v1",
+        api_key="test-key",
+        model="free-model",
+    )
+
+    assert generator.generate("prompt") == "A concise answer."
+    assert request["headers"] == {"Authorization": "Bearer test-key"}
+    assert request["json"]["model"] == "free-model"  # type: ignore[index]
+    assert request["json"]["messages"] == [  # type: ignore[index]
+        {"role": "user", "content": "prompt"}
+    ]
+
+
+def test_openai_compatible_generator_requires_api_key() -> None:
+    from app.generation.service import OpenAICompatibleGenerator
+
+    with pytest.raises(GenerationError, match="OPENAI_API_KEY"):
+        OpenAICompatibleGenerator(api_key="").generate("prompt")

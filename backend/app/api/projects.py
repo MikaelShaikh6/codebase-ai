@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, UploadFile
@@ -12,6 +13,7 @@ from app.generation.service import (
     GeneratedAnswer,
     GenerationError,
     OllamaGenerator,
+    OpenAICompatibleGenerator,
 )
 from app.models.project import Project, ProjectStatus
 from app.ingestion.zip_handler import validate_upload_content, validate_upload_filename
@@ -83,6 +85,8 @@ def get_retrieval_service() -> RetrievalService:
 
 
 def get_generation_service() -> AnswerGenerationService:
+    if os.getenv("LLM_PROVIDER", "ollama").lower() == "openai_compatible":
+        return AnswerGenerationService(OpenAICompatibleGenerator())
     return AnswerGenerationService(OllamaGenerator())
 
 

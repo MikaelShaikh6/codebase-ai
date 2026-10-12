@@ -10,12 +10,16 @@ resources that should not be tied to a web-service container.
 Create:
 
 1. A Qdrant Cloud cluster and API key.
-2. An Ollama-compatible HTTPS endpoint with the `qwen3:4b` model available.
+2. An OpenAI-compatible inference endpoint and API key. A provider's free
+   tier may be used, but free quotas and model availability vary.
 3. A Render account connected to this repository.
 
-The Ollama URL must be reachable from Render. `localhost` and
-`host.docker.internal` only work for local development and must not be used for
-the deployed backend.
+The deployed Render service uses `LLM_PROVIDER=openai_compatible`. Configure
+`OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL` in Render. The endpoint
+must support `POST /chat/completions`.
+
+For local development, `LLM_PROVIDER=ollama` keeps the existing local Ollama
+workflow.
 
 For local Docker Compose development, Ollama runs on the host while the
 backend runs in a container. Compose reads `OLLAMA_URL` from the repository's
@@ -55,10 +59,12 @@ local firewall restricted to trusted networks.
 1. In Render, choose **New → Blueprint** and select this repository.
 2. Render reads [render.yaml](./render.yaml) and creates the backend and
    frontend services.
-3. Enter the secret values when Render prompts for them:
+3. Enter the provider values when Render prompts for them:
    - `QDRANT_URL`
    - `QDRANT_API_KEY`
-   - `OLLAMA_URL`
+   - `OPENAI_BASE_URL`
+   - `OPENAI_API_KEY`
+   - `OPENAI_MODEL`
 4. Wait for the backend health check at `/health` and the frontend deployment
    to become live.
 5. Open the frontend service URL and upload a small test project.
