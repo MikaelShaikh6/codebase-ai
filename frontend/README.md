@@ -57,3 +57,12 @@ ollama pull qwen3:4b
 
 For a cloud deployment, see the repository-level
 [DEPLOYMENT.md](../DEPLOYMENT.md).
+
+To configure the Ollama address for Compose without editing tracked files:
+
+```bash
+cp ../.env.example ../.env
+```
+
+Then set `OLLAMA_URL` in `../.env` if `host.docker.internal` is not reachable
+from your Docker environment.

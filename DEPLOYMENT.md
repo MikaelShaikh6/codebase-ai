@@ -18,10 +18,22 @@ The Ollama URL must be reachable from Render. `localhost` and
 the deployed backend.
 
 For local Docker Compose development, Ollama runs on the host while the
-backend runs in a container. Compose therefore sets
-`OLLAMA_URL=http://host.docker.internal:11434` and maps that hostname to the
-Docker host. On Linux, configure Ollama to listen beyond loopback before
-starting Compose:
+backend runs in a container. Compose reads `OLLAMA_URL` from the repository's
+`.env` file and uses `http://host.docker.internal:11434` only as its fallback.
+Create the local environment file before starting Compose:
+
+```bash
+cp .env.example .env
+```
+
+If your Docker host requires a specific reachable address, edit `.env`:
+
+```text
+OLLAMA_URL=http://your-host-address:11434
+```
+
+The `.env` file is ignored by Git and must not be committed. On Linux,
+configure Ollama to listen beyond loopback before starting Compose:
 
 ```bash
 OLLAMA_HOST=0.0.0.0:11434 ollama serve
