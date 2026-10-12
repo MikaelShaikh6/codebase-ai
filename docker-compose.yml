@@ -7,7 +7,7 @@ services:
       QDRANT_URL: http://qdrant:6333
       QDRANT_COLLECTION: codebase_chunks
       FRONTEND_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
-      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_URL: http://172.26.229.151:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

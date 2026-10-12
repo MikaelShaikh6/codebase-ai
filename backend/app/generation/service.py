@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Protocol, Sequence
 
@@ -11,6 +12,7 @@ from app.retrieval.service import RetrievedChunk
 
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "qwen3:4b"
+THINKING_BLOCK_PATTERN = re.compile(r"<think>.*?</think>\s*", re.IGNORECASE | re.DOTALL)
 
 
 class GenerationError(RuntimeError):
@@ -51,7 +53,16 @@ class OllamaGenerator:
         try:
             response = httpx.post(
                 f"{self.base_url}/api/generate",
-                json={"model": self.model, "prompt": prompt, "stream": False},
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "think": False,
+                    "options": {
+                        "temperature": 0.2,
+                        "num_predict": 120,
+                    },
+                },
                 timeout=self.timeout,
             )
             response.raise_for_status()
@@ -59,7 +70,12 @@ class OllamaGenerator:
             answer = payload.get("response")
             if not isinstance(answer, str) or not answer.strip():
                 raise GenerationError("Ollama returned an empty answer.")
-            return answer.strip()
+            cleaned_answer = THINKING_BLOCK_PATTERN.sub("", answer).strip()
+            if "</think>" in cleaned_answer.lower():
+                cleaned_answer = cleaned_answer.rsplit("</think>", 1)[-1].strip()
+            if not cleaned_answer:
+                raise GenerationError("Ollama returned an empty answer.")
+            return cleaned_answer
         except GenerationError:
             raise
         except (httpx.HTTPError, ValueError, TypeError) as error:
@@ -112,7 +128,9 @@ def build_grounded_prompt(
     return f"""You are Codebase AI, a codebase question-answering assistant.
 Answer the user's question using only the supplied project context.
 Do not invent files, symbols, behavior, or configuration that is not present.
-Answer directly and briefly. If the context is insufficient, say so clearly.
+Return only the final answer. Do not show reasoning, analysis, planning, or a
+restatement of the question. Use at most three sentences and no headings or
+bullet points. If the context is insufficient, say so clearly.
 Include relevant source references using the provided file paths and line ranges.
 
 User question:

@@ -17,6 +17,7 @@ type Citation = { file_path: string; start_line: number; end_line: number };
 type ChatMessage = { question: string; answer: string; citations: Citation[] };
 
 const MAX_UPLOAD_SIZE = 50 * 1024 * 1024;
+const CHAT_TIMEOUT_MS = 150_000;
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
@@ -129,16 +130,28 @@ export default function Home() {
     if (!selectedProjectId || !question.trim()) return;
     setIsChatting(true);
     setError("");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
     try {
       const response = await apiRequest<{ answer: string; citations: Citation[] }>(
         `/projects/${selectedProjectId}/chat`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) },
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question }),
+          signal: controller.signal,
+        },
       );
       setMessages((current) => [...current, { question, ...response }]);
       setQuestion("");
     } catch (chatError) {
-      setError(chatError instanceof Error ? chatError.message : "Could not answer that question.");
+      if (chatError instanceof DOMException && chatError.name === "AbortError") {
+        setError("The answer took too long. Check that Ollama is reachable, then try again.");
+      } else {
+        setError(chatError instanceof Error ? chatError.message : "Could not answer that question.");
+      }
     } finally {
+      window.clearTimeout(timeout);
       setIsChatting(false);
     }
   }
@@ -192,7 +205,7 @@ export default function Home() {
               <div className="panel-heading"><div><p className="eyebrow">Active project</p><h2>{selectedProject.filename}</h2></div><span className={`project-state status-${selectedProject.status}`}>{selectedProject.status}</span></div>
               {selectedProject.status !== "ready" && <div className="processing-box"><span className="spinner" /> {selectedProject.status === "failed" ? selectedProject.error : "Processing files, generating embeddings, and indexing vectors..."}</div>}
               <div className="conversation">{messages.length === 0 && selectedProject.status === "ready" && <p className="empty-copy">Ask where authentication, database connections, or any other behavior is implemented.</p>}{messages.map((message, index) => <article className="answer-card" key={`${message.question}-${index}`}><p className="question-label">You asked</p><p className="question-text">{message.question}</p><p className="answer-text">{message.answer}</p>{message.citations.length > 0 && <div className="citation-list"><p className="question-label">Sources</p>{message.citations.map((citation) => <code key={`${citation.file_path}-${citation.start_line}`}>{citation.file_path}:{citation.start_line}-{citation.end_line}</code>)}</div>}</article>)}</div>
-              <form className="chat-form" onSubmit={askQuestion}><input value={question} onChange={(event) => setQuestion(event.target.value)} disabled={selectedProject.status !== "ready" || isChatting} placeholder={selectedProject.status === "ready" ? "Ask about this project..." : "Project is still processing..."} /><button className="upload-button" disabled={selectedProject.status !== "ready" || isChatting || !question.trim()}>{isChatting ? "Thinking..." : "Ask"}</button></form>
+              <form className="chat-form" onSubmit={askQuestion}><input value={question} onChange={(event) => setQuestion(event.target.value)} disabled={selectedProject.status !== "ready" || isChatting} placeholder={selectedProject.status === "ready" ? "Ask about this project..." : "Project is still processing..."} /><button className="upload-button" disabled={selectedProject.status !== "ready" || isChatting || !question.trim()}>{isChatting ? "Thinking (up to 2 min)..." : "Ask"}</button></form>
             </div>
           )}
           {error && <p className="message error-message">{error}</p>}

@@ -81,3 +81,56 @@ def test_ollama_generator_rejects_empty_response(monkeypatch: pytest.MonkeyPatch
 
     with pytest.raises(GenerationError, match="empty answer"):
         OllamaGenerator().generate("prompt")
+
+
+def test_ollama_generator_disables_extended_thinking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload: dict[str, object] = {}
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, str]:
+            return {"response": "A concise answer."}
+
+    def fake_post(*args: object, **kwargs: object) -> Response:
+        request_payload = kwargs["json"]
+        assert isinstance(request_payload, dict)
+        payload.update(request_payload)
+        return Response()
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    from app.generation.service import OllamaGenerator
+
+    assert OllamaGenerator().generate("prompt") == "A concise answer."
+    assert payload["think"] is False
+    assert payload["options"] == {"temperature": 0.2, "num_predict": 120}
+
+
+def test_ollama_generator_removes_thinking_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, str]:
+            return {
+                "response": (
+                    "Reasoning that should not be shown.\n"
+                    "</think>\n"
+                    "The project is a rectangle calculator."
+                )
+            }
+
+    monkeypatch.setattr("httpx.post", lambda *args, **kwargs: Response())
+
+    from app.generation.service import OllamaGenerator
+
+    assert (
+        OllamaGenerator().generate("prompt")
+        == "The project is a rectangle calculator."
+    )
