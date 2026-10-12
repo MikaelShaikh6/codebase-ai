@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 
 from app.core.database import engine
 from app.core.auth import get_current_user
+from app.core.rate_limit import rate_limit
 from app.generation.service import (
     AnswerGenerationService,
     GeneratedAnswer,
@@ -117,7 +118,11 @@ def get_project_status(project_id: str, current_user: User | None = Depends(get_
     return get_project(project_id, current_user)
 
 
-@router.post("/{project_id}/chat", response_model=ChatResponse)
+@router.post(
+    "/{project_id}/chat",
+    response_model=ChatResponse,
+    dependencies=[Depends(rate_limit("chat", max_requests=20, window_seconds=3600))],
+)
 def chat_with_project(
     project_id: str,
     request: ChatRequest,
@@ -167,7 +172,10 @@ def chat_with_project(
     )
 
 
-@router.post("/upload")
+@router.post(
+    "/upload",
+    dependencies=[Depends(rate_limit("upload", max_requests=5, window_seconds=3600))],
+)
 async def upload_project(
     background_tasks: BackgroundTasks,
     file: UploadFile,

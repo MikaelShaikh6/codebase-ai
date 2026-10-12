@@ -1,11 +1,12 @@
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session, select
 
 from app.core.auth import create_access_token, hash_password, verify_password
 from app.core.database import engine
+from app.core.rate_limit import rate_limit
 from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -21,7 +22,11 @@ class AuthResponse(BaseModel):
     token_type: str = "bearer"
 
 
-@router.post("/register", response_model=AuthResponse)
+@router.post(
+    "/register",
+    response_model=AuthResponse,
+    dependencies=[Depends(rate_limit("register", max_requests=5, window_seconds=3600))],
+)
 def register(request: AuthRequest) -> AuthResponse:
     email = request.email.lower()
     with Session(engine) as session:
@@ -33,7 +38,11 @@ def register(request: AuthRequest) -> AuthResponse:
     return AuthResponse(access_token=create_access_token(user.id))
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post(
+    "/login",
+    response_model=AuthResponse,
+    dependencies=[Depends(rate_limit("login", max_requests=10, window_seconds=900))],
+)
 def login(request: AuthRequest) -> AuthResponse:
     with Session(engine) as session:
         user = session.exec(select(User).where(User.email == request.email.lower())).first()

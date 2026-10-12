@@ -81,6 +81,9 @@ The blueprint attaches a persistent Render disk so those files survive
 deploys. Qdrant Cloud provides persistence for vectors.
 
 This is a practical single-instance deployment for a portfolio project.
+The API also applies in-memory request limits for authentication, uploads, and
+chat. These limits protect a single instance; use a shared Redis-backed
+limiter before running multiple backend instances.
 Before production scale, replace SQLite with managed PostgreSQL, move uploaded
 archives to object storage, and replace in-process `BackgroundTasks` with a
 durable worker queue. Those changes avoid data loss and make processing
