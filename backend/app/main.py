@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.projects import router as projects_router
 from app.api.auth import router as auth_router
 from app.core.database import create_db_and_tables
+from app.services.project_worker import start_project_worker
 
 
 app = FastAPI(
@@ -39,6 +40,7 @@ app.include_router(auth_router)
 @app.on_event("startup")
 async def startup() -> None:
     create_db_and_tables()
+    start_project_worker()
 
 
 @app.get("/health")

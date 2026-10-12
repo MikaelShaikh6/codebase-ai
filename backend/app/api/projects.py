@@ -24,6 +24,7 @@ from app.ingestion.zip_handler import validate_upload_content, validate_upload_f
 from app.retrieval.service import RetrievalService
 from app.services.embeddings import EmbeddingService, FastEmbedProvider
 from app.services.vector_store import QdrantVectorStore, VectorStoreError
+from app.models.job import ProjectJob
 from app.services.project_processor import process_project
 
 
@@ -201,13 +202,17 @@ async def upload_project(
 
     with Session(engine) as session:
         session.add(project)
+        session.add(ProjectJob(id=str(uuid4()), project_id=project_id))
         session.commit()
 
-    background_tasks.add_task(
-        process_project,
-        project_id,
-        project_directory=project_directory,
-    )
+    # Keep local request-based processing available while the durable worker is
+    # disabled; the persisted job remains available for worker recovery.
+    if os.getenv("RUN_PROJECT_WORKER", "false").lower() != "true":
+        background_tasks.add_task(
+            process_project,
+            project_id,
+            project_directory=project_directory,
+        )
 
     return ProjectUploadResponse(
         project_id=project_id,
