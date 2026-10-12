@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: codebase-ai-backend
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    disk:
+      name: codebase-ai-data
+      mountPath: /app/data
+      sizeGB: 10
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///data/codebase.db
+      - key: FRONTEND_ORIGINS
+        fromService:
+          type: web
+          name: codebase-ai-frontend
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: codebase_chunks
+      - key: OLLAMA_URL
+        sync: false
+      - key: OLLAMA_MODEL
+        value: qwen3:4b
+      - key: EMBEDDING_MODEL
+        value: BAAI/bge-small-en-v1.5
+
+  - type: web
+    name: codebase-ai-frontend
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    healthCheckPath: /
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: codebase-ai-backend
+          envVarKey: RENDER_EXTERNAL_URL

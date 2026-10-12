@@ -46,3 +46,6 @@ Open [http://localhost:3000](http://localhost:3000). The API is available at
 Compose persists SQLite, uploaded project files, and Qdrant data in named
 volumes. Ollama is expected to run on the host by default; set
 `OLLAMA_URL` appropriately if it runs elsewhere.
+
+For a cloud deployment, see the repository-level
+[DEPLOYMENT.md](../DEPLOYMENT.md).
