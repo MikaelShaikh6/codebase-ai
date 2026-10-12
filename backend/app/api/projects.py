@@ -4,10 +4,12 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi import BackgroundTasks
+from fastapi import Depends
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.core.database import engine
+from app.core.auth import get_current_user
 from app.generation.service import (
     AnswerGenerationService,
     GeneratedAnswer,
@@ -16,6 +18,7 @@ from app.generation.service import (
     OpenAICompatibleGenerator,
 )
 from app.models.project import Project, ProjectStatus
+from app.models.user import User
 from app.ingestion.zip_handler import validate_upload_content, validate_upload_filename
 from app.retrieval.service import RetrievalService
 from app.services.embeddings import EmbeddingService, FastEmbedProvider
@@ -91,32 +94,34 @@ def get_generation_service() -> AnswerGenerationService:
 
 
 @router.get("", response_model=list[ProjectResponse])
-def list_projects() -> list[ProjectResponse]:
+def list_projects(current_user: User | None = Depends(get_current_user)) -> list[ProjectResponse]:
     with Session(engine) as session:
-        projects = session.exec(
-            select(Project).order_by(Project.created_at.desc())
-        ).all()
+        query = select(Project).order_by(Project.created_at.desc())
+        if current_user is not None:
+            query = query.where(Project.owner_id == current_user.id)
+        projects = session.exec(query).all()
     return [project_response(project) for project in projects]
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
-def get_project(project_id: str) -> ProjectResponse:
+def get_project(project_id: str, current_user: User | None = Depends(get_current_user)) -> ProjectResponse:
     with Session(engine) as session:
         project = session.get(Project, project_id)
-    if project is None:
+    if project is None or (current_user is not None and project.owner_id != current_user.id):
         raise HTTPException(status_code=404, detail="Project not found.")
     return project_response(project)
 
 
 @router.get("/{project_id}/status", response_model=ProjectResponse)
-def get_project_status(project_id: str) -> ProjectResponse:
-    return get_project(project_id)
+def get_project_status(project_id: str, current_user: User | None = Depends(get_current_user)) -> ProjectResponse:
+    return get_project(project_id, current_user)
 
 
 @router.post("/{project_id}/chat", response_model=ChatResponse)
 def chat_with_project(
     project_id: str,
     request: ChatRequest,
+    current_user: User | None = Depends(get_current_user),
 ) -> ChatResponse:
     if request.limit < 1 or request.limit > 20:
         raise HTTPException(
@@ -126,7 +131,7 @@ def chat_with_project(
 
     with Session(engine) as session:
         project = session.get(Project, project_id)
-    if project is None:
+    if project is None or (current_user is not None and project.owner_id != current_user.id):
         raise HTTPException(status_code=404, detail="Project not found.")
     if project.status != ProjectStatus.READY:
         raise HTTPException(
@@ -166,6 +171,7 @@ def chat_with_project(
 async def upload_project(
     background_tasks: BackgroundTasks,
     file: UploadFile,
+    current_user: User | None = Depends(get_current_user),
 ) -> ProjectUploadResponse:
     project_id = str(uuid4())
     filename = file.filename
@@ -180,6 +186,7 @@ async def upload_project(
 
     project = Project(
         id=project_id,
+        owner_id=current_user.id if isinstance(current_user, User) else None,
         filename=filename,
         status=ProjectStatus.PROCESSING,
     )

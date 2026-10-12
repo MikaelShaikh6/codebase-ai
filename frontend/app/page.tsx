@@ -15,13 +15,17 @@ type Project = {
 type UploadResult = Pick<Project, "project_id" | "filename" | "status" | "files_found"> & { files: string[] };
 type Citation = { file_path: string; start_line: number; end_line: number };
 type ChatMessage = { question: string; answer: string; citations: Citation[] };
+type AuthResponse = { access_token: string; token_type: string };
 
 const MAX_UPLOAD_SIZE = 50 * 1024 * 1024;
 const CHAT_TIMEOUT_MS = 150_000;
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, options);
+  const token = typeof window !== "undefined" ? window.localStorage.getItem("codebase_ai_token") : null;
+  const headers = new Headers(options?.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(`${API_URL}${path}`, { ...options, headers });
   const payload = await response.json();
   if (!response.ok) throw new Error(payload.detail ?? "The API request failed.");
   return payload as T;
@@ -40,6 +44,41 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [isChatting, setIsChatting] = useState(false);
   const [isApiConnected, setIsApiConnected] = useState<boolean | null>(null);
+  const [token, setToken] = useState(() => (
+    typeof window !== "undefined" ? window.localStorage.getItem("codebase_ai_token") ?? "" : ""
+  ));
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  async function authenticate(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsAuthenticating(true);
+    setError("");
+    try {
+      const response = await apiRequest<AuthResponse>(`/auth/${authMode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      window.localStorage.setItem("codebase_ai_token", response.access_token);
+      setToken(response.access_token);
+      setPassword("");
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : "Authentication failed.");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }
+
+  function signOut() {
+    window.localStorage.removeItem("codebase_ai_token");
+    setToken("");
+    setProjects([]);
+    setSelectedProjectId("");
+    setMessages([]);
+  }
 
   const loadProjects = useCallback(async () => {
     try {
@@ -51,6 +90,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (!token) return;
     const controller = new AbortController();
     apiRequest<Project[]>("/projects")
       .then((items) => {
@@ -71,7 +111,7 @@ export default function Home() {
         if (!(healthError instanceof DOMException && healthError.name === "AbortError")) setIsApiConnected(false);
       });
     return () => controller.abort();
-  }, [loadProjects]);
+  }, [loadProjects, token]);
 
   const selectedProject = projects.find((project) => project.project_id === selectedProjectId);
 
@@ -169,8 +209,12 @@ export default function Home() {
         <div className="brand-mark">CA</div>
         <div><p className="eyebrow">Codebase AI</p><p className="topbar-subtitle">Project workspace</p></div>
         <span className={`api-status${isApiConnected === false ? " is-offline" : ""}`}><span className="api-status-dot" /> API · {isApiConnected === null ? "checking" : isApiConnected ? "connected" : "offline"}</span>
+        {token && <button className="clear-button" type="button" onClick={signOut}>Sign out</button>}
       </header>
 
+      {!token && <section className="upload-panel auth-panel"><div className="panel-heading"><div><p className="eyebrow">Private workspace</p><h2>{authMode === "login" ? "Sign in" : "Create account"}</h2></div></div><form className="auth-form" onSubmit={authenticate}><input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email address" /><input type="password" required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password (8+ characters)" /><button className="upload-button" disabled={isAuthenticating}>{isAuthenticating ? "Please wait..." : authMode === "login" ? "Sign in" : "Register"}</button></form><button className="clear-button" type="button" onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}>{authMode === "login" ? "Need an account?" : "Already have an account?"}</button>{error && <p className="message error-message">{error}</p>}</section>}
+
+      {token &&
       <section className="workspace-grid">
         <aside className="project-sidebar">
           <div className="panel-heading"><div><p className="eyebrow">Workspace</p><h2>Projects</h2></div><span className="step-count">{projects.length}</span></div>
@@ -185,7 +229,7 @@ export default function Home() {
         </aside>
 
         <section className="workspace-main">
-          <div className="intro-copy"><p className="eyebrow accent">Understand your codebase</p><h1>Ask questions grounded in your project.</h1><p className="lede">Upload a ZIP, wait for indexing to finish, then explore the code with source-backed answers.</p></div>
+          <div className="intro-copy"><p className="eyebrow accent">Understand your codebase</p><h1>Ask questions grounded in your project.</h1><p className="lede">Upload a ZIP and explore the code with source-backed answers.</p></div>
 
           {!selectedProject && (
             <div className="upload-panel">
@@ -210,7 +254,7 @@ export default function Home() {
           )}
           {error && <p className="message error-message">{error}</p>}
         </section>
-      </section>
+      </section>}
     </main>
   );
 }

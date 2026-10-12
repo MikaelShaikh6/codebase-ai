@@ -15,6 +15,7 @@ class ProjectStatus(StrEnum):
 
 class Project(SQLModel, table=True):
     id: str = Field(primary_key=True)
+    owner_id: str | None = Field(default=None, index=True)
     filename: str
     status: ProjectStatus = Field(default=ProjectStatus.UPLOADED)
     files_found: int = Field(default=0)
