@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.projects import router as projects_router
+from app.core.database import create_db_and_tables
 
 
 app = FastAPI(
@@ -31,6 +32,11 @@ app.add_middleware(
 
 
 app.include_router(projects_router)
+
+
+@app.on_event("startup")
+async def startup() -> None:
+    create_db_and_tables()
 
 
 @app.get("/health")
