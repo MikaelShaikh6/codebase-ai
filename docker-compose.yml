@@ -7,13 +7,15 @@ services:
       QDRANT_URL: http://qdrant:6333
       QDRANT_COLLECTION: codebase_chunks
       FRONTEND_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      OLLAMA_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     volumes:
       - backend-data:/app/data
     depends_on:
-      qdrant:
-        condition: service_healthy
+      - qdrant
 
   frontend:
     build:
@@ -32,11 +34,6 @@ services:
       - "6334:6334"
     volumes:
       - qdrant-data:/qdrant/storage
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:6333/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
 volumes:
   backend-data:

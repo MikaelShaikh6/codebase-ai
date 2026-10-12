@@ -47,5 +47,13 @@ Compose persists SQLite, uploaded project files, and Qdrant data in named
 volumes. Ollama is expected to run on the host by default; set
 `OLLAMA_URL` appropriately if it runs elsewhere.
 
+On Linux, Ollama must accept connections from the backend container. Start it
+for local Compose use with:
+
+```bash
+OLLAMA_HOST=0.0.0.0:11434 ollama serve
+ollama pull qwen3:4b
+```
+
 For a cloud deployment, see the repository-level
 [DEPLOYMENT.md](../DEPLOYMENT.md).

@@ -17,6 +17,27 @@ The Ollama URL must be reachable from Render. `localhost` and
 `host.docker.internal` only work for local development and must not be used for
 the deployed backend.
 
+For local Docker Compose development, Ollama runs on the host while the
+backend runs in a container. Compose therefore sets
+`OLLAMA_URL=http://host.docker.internal:11434` and maps that hostname to the
+Docker host. On Linux, configure Ollama to listen beyond loopback before
+starting Compose:
+
+```bash
+OLLAMA_HOST=0.0.0.0:11434 ollama serve
+```
+
+Then confirm the model is installed:
+
+```bash
+ollama pull qwen3:4b
+curl http://localhost:11434/api/tags
+```
+
+If Ollama is already managed as a system service, set its service
+environment to `OLLAMA_HOST=0.0.0.0:11434`, restart the service, and keep the
+local firewall restricted to trusted networks.
+
 ## Deploy with Render
 
 1. In Render, choose **New → Blueprint** and select this repository.
