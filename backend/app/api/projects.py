@@ -25,6 +25,7 @@ from app.retrieval.service import RetrievalService
 from app.services.embeddings import EmbeddingService, FastEmbedProvider
 from app.services.vector_store import QdrantVectorStore, VectorStoreError
 from app.models.job import ProjectJob
+from app.services.storage import get_project_storage
 from app.services.project_processor import process_project
 
 
@@ -190,8 +191,7 @@ async def upload_project(
     validate_upload_content(content)
 
     project_directory = UPLOAD_DIRECTORY / project_id
-    project_directory.mkdir(parents=True, exist_ok=True)
-    (project_directory / "upload.zip").write_bytes(content)
+    get_project_storage().save_archive(project_id, content)
 
     project = Project(
         id=project_id,

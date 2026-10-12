@@ -10,6 +10,7 @@ from app.ingestion.zip_handler import extract_zip_file
 from app.models.project import Project, ProjectStatus
 from app.services.embeddings import EmbeddingService, FastEmbedProvider
 from app.services.vector_store import QdrantVectorStore
+from app.services.storage import get_project_storage
 
 
 def process_project(
@@ -22,6 +23,8 @@ def process_project(
     archive_path = project_directory / "upload.zip"
 
     try:
+        if not archive_path.exists():
+            get_project_storage().restore_archive(project_id, project_directory)
         extracted_files = extract_zip_file(archive_path, project_directory)
         ingestion = chunk_extracted_files(
             extracted_files,

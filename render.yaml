@@ -17,6 +17,18 @@ services:
         value: "true"
       - key: RUN_PROJECT_WORKER
         value: "true"
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        value: auto
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_ORIGINS
