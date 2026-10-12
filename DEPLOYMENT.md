@@ -1,7 +1,7 @@
 # Cloud deployment
 
 The repository includes a [Render Blueprint](./render.yaml) for deploying the
-frontend and backend as Docker web services. Qdrant and Ollama remain external
+frontend and backend as free Docker web services. Qdrant and model inference remain external
 dependencies because they need persistent storage and model-serving
 resources that should not be tied to a web-service container.
 
@@ -76,13 +76,21 @@ value, while `FRONTEND_ORIGINS` is a backend CORS value.
 
 ## Storage and operations
 
-The backend uses SQLite and stores uploaded project files under `/app/data`.
-The blueprint attaches a persistent Render disk so those files survive
-deploys. For cloud deployments, set `STORAGE_BACKEND=s3` and configure a
-Cloudflare R2 bucket using the `S3_*` variables in the Blueprint. R2 stores
-uploaded archives independently of the backend container. Supabase or another
+For cloud deployments, set `STORAGE_BACKEND=s3` and configure a Cloudflare R2
+bucket using the `S3_*` variables in the Blueprint. R2 stores uploaded
+archives independently of the ephemeral Render container. Supabase or another
 managed PostgreSQL provider can be used by setting `DATABASE_URL` to its
 SQLAlchemy PostgreSQL URL.
+
+The Blueprint uses Render's Free plan and intentionally has no Render
+persistent disk. Free services can sleep, have limited monthly runtime, and
+their local filesystem is not durable. Supabase and R2 are therefore required
+for cloud data.
+
+This can be a $0 demo only while every service remains within its provider's
+free allowance. Render, Supabase, R2, Qdrant, and model-provider quotas and
+billing terms can change. Disable paid upgrades and configure usage alerts in
+each dashboard; do not assume any provider offers unlimited free usage.
 
 This is a practical single-instance deployment for a portfolio project.
 The API also applies in-memory request limits for authentication, uploads, and

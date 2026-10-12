@@ -2,14 +2,10 @@ services:
   - type: web
     name: codebase-ai-backend
     runtime: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /health
-    disk:
-      name: codebase-ai-data
-      mountPath: /app/data
-      sizeGB: 10
     envVars:
       - key: DATABASE_URL
         value: sqlite:///data/codebase.db
@@ -56,7 +52,7 @@ services:
   - type: web
     name: codebase-ai-frontend
     runtime: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: ./frontend
     healthCheckPath: /
