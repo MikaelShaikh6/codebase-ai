@@ -1,0 +1,12 @@
+.git
+.github
+backend/.venv
+backend/data
+frontend/node_modules
+frontend/.next
+frontend/out
+__pycache__
+*.py[cod]
+.env
+.env.*
+PROJECT_PROGRESS.md

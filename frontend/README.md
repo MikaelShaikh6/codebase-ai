@@ -30,3 +30,19 @@ For example:
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ```
+
+## Docker Compose
+
+From the repository root, start the frontend, backend, and Qdrant:
+
+```bash
+docker compose up --build
+```
+
+Open [http://localhost:3000](http://localhost:3000). The API is available at
+[http://localhost:8000](http://localhost:8000), and Qdrant is available at
+[http://localhost:6333](http://localhost:6333).
+
+Compose persists SQLite, uploaded project files, and Qdrant data in named
+volumes. Ollama is expected to run on the host by default; set
+`OLLAMA_URL` appropriately if it runs elsewhere.
