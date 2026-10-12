@@ -101,41 +101,43 @@ async def process_zip_upload(
     file: UploadFile,
     destination: Path,
 ) -> list[Path]:
-    if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="A file is required.",
-        )
-
-    if not file.filename.lower().endswith(".zip"):
-        raise HTTPException(
-            status_code=400,
-            detail="Only ZIP files are supported.",
-        )
+    validate_upload_filename(file.filename)
 
     content = await file.read()
+    validate_upload_content(content)
 
+    destination.mkdir(parents=True, exist_ok=True)
+    zip_path = destination / "upload.zip"
+
+    try:
+        zip_path.write_bytes(content)
+        return extract_zip_file(zip_path, destination)
+    finally:
+        if zip_path.exists():
+            zip_path.unlink()
+
+
+def validate_upload_filename(filename: str | None) -> None:
+    if not filename:
+        raise HTTPException(status_code=400, detail="A file is required.")
+    if not filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Only ZIP files are supported.")
+
+
+def validate_upload_content(content: bytes) -> None:
     if len(content) > MAX_UPLOAD_SIZE:
         raise HTTPException(
             status_code=413,
             detail="ZIP file is too large. Maximum size is 50 MB.",
         )
 
-    destination.mkdir(parents=True, exist_ok=True)
 
-    zip_path = destination / "upload.zip"
-
+def extract_zip_file(zip_path: Path, destination: Path) -> list[Path]:
     try:
-        zip_path.write_bytes(content)
-
         with ZipFile(zip_path) as zip_file:
             return safe_extract(zip_file, destination)
-
-    except BadZipFile:
+    except BadZipFile as error:
         raise HTTPException(
             status_code=400,
             detail="The uploaded file is not a valid ZIP archive.",
-        )
-    finally:
-        if zip_path.exists():
-            zip_path.unlink()
+        ) from error

@@ -4,6 +4,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from fastapi import UploadFile
+from fastapi.background import BackgroundTasks
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.api import projects
@@ -17,7 +18,7 @@ def zip_bytes() -> bytes:
     return buffer.getvalue()
 
 
-def test_upload_persists_ready_project(
+def test_upload_persists_processing_project(
     tmp_path: Path, monkeypatch
 ) -> None:
     database_engine = create_engine(
@@ -26,9 +27,11 @@ def test_upload_persists_ready_project(
     SQLModel.metadata.create_all(database_engine)
     monkeypatch.setattr(projects, "engine", database_engine)
     monkeypatch.setattr(projects, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(projects, "process_project", lambda *args, **kwargs: None)
 
     response = asyncio.run(
         projects.upload_project(
+            BackgroundTasks(),
             UploadFile(filename="project.zip", file=BytesIO(zip_bytes()))
         )
     )
@@ -38,6 +41,6 @@ def test_upload_persists_ready_project(
             select(Project).where(Project.id == response.project_id)
         ).one()
 
-    assert response.status == ProjectStatus.READY
-    assert project.status == ProjectStatus.READY
-    assert project.files_found == 1
+    assert response.status == ProjectStatus.PROCESSING
+    assert project.status == ProjectStatus.PROCESSING
+    assert project.files_found == 0
