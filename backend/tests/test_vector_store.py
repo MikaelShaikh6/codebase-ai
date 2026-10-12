@@ -72,3 +72,22 @@ def test_delete_project_removes_only_matching_payloads() -> None:
 
     assert len(points) == 1
     assert points[0].payload["project_id"] == "project-2"
+
+
+def test_search_filters_results_to_project() -> None:
+    vector_store = store()
+    vector_store.index_chunks([embedded("one", "project-1")])
+    vector_store.index_chunks([embedded("two", "project-2")])
+
+    results = vector_store.search(
+        [1.0, 0.0, 0.0],
+        project_id="project-1",
+    )
+
+    assert len(results) == 1
+    assert results[0].payload["project_id"] == "project-1"
+
+
+def test_search_rejects_empty_vector() -> None:
+    with pytest.raises(VectorStoreError, match="empty vector"):
+        store().search([], project_id="project-1")

@@ -24,6 +24,12 @@ class IndexResult:
     collection_name: str
 
 
+@dataclass(frozen=True)
+class VectorSearchResult:
+    score: float
+    payload: dict[str, object]
+
+
 class QdrantVectorStore:
     def __init__(
         self,
@@ -110,6 +116,46 @@ class QdrantVectorStore:
             raise VectorStoreError(
                 f"Could not delete project {project_id} from Qdrant: {error}"
             ) from error
+
+    def search(
+        self,
+        vector: list[float],
+        *,
+        project_id: str,
+        limit: int = 5,
+    ) -> list[VectorSearchResult]:
+        if not vector:
+            raise VectorStoreError("Cannot search with an empty vector.")
+        if limit < 1:
+            raise VectorStoreError("Search limit must be positive.")
+
+        try:
+            response = self.client.query_points(
+                collection_name=self.collection_name,
+                query=vector,
+                query_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="project_id",
+                            match=models.MatchValue(value=project_id),
+                        )
+                    ]
+                ),
+                limit=limit,
+                with_payload=True,
+            )
+        except Exception as error:
+            raise VectorStoreError(
+                f"Could not search {self.collection_name}: {error}"
+            ) from error
+
+        return [
+            VectorSearchResult(
+                score=point.score,
+                payload=dict(point.payload or {}),
+            )
+            for point in response.points
+        ]
 
     def _ensure_collection(self, vector_size: int) -> None:
         if self.client.collection_exists(self.collection_name):
