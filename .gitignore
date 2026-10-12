@@ -22,3 +22,5 @@ frontend/out/
 # OS / editor
 .DS_Store
 .vscode/
+context.md
+PROJECT_PROGRESS.md

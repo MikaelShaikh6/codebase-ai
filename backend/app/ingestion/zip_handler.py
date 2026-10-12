@@ -65,7 +65,7 @@ def safe_extract(zip_file: ZipFile, destination: Path) -> list[Path]:
         # Prevent path traversal.
         target_path = (destination / member_path).resolve()
 
-        if not str(target_path).startswith(str(destination)):
+        if target_path != destination and destination not in target_path.parents:
             raise HTTPException(
                 status_code=400,
                 detail="ZIP contains an unsafe file path.",

@@ -1,69 +1,197 @@
-import Image from "next/image";
+"use client";
+
+import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
+
+type UploadResult = {
+  project_id: string;
+  filename: string;
+  files_found: number;
+  files: string[];
+};
+
+const MAX_UPLOAD_SIZE = 50 * 1024 * 1024;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function Home() {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [result, setResult] = useState<UploadResult | null>(null);
+  const [error, setError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isApiConnected, setIsApiConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetch(`${API_URL}/health`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("Health check failed");
+        setIsApiConnected(true);
+      })
+      .catch((healthError: unknown) => {
+        if (healthError instanceof DOMException && healthError.name === "AbortError") return;
+        setIsApiConnected(false);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  function chooseFile(file?: File) {
+    setError("");
+    setResult(null);
+
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".zip")) {
+      setSelectedFile(null);
+      setError("Choose a ZIP archive to upload.");
+      return;
+    }
+    if (file.size > MAX_UPLOAD_SIZE) {
+      setSelectedFile(null);
+      setError("That archive is larger than the 50 MB limit.");
+      return;
+    }
+    setSelectedFile(file);
+  }
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    chooseFile(event.target.files?.[0]);
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+    chooseFile(event.dataTransfer.files[0]);
+  }
+
+  async function uploadProject() {
+    if (!selectedFile) return;
+
+    setIsUploading(true);
+    setError("");
+    setResult(null);
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    try {
+      const response = await fetch(`${API_URL}/projects/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.detail ?? "The project could not be uploaded.");
+      }
+
+      setResult(payload);
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Could not connect to the API. Is the backend running?",
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  function clearSelection() {
+    setSelectedFile(null);
+    setResult(null);
+    setError("");
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="workspace-shell">
+      <header className="topbar">
+        <div className="brand-mark">CA</div>
+        <div>
+          <p className="eyebrow">Codebase AI</p>
+          <p className="topbar-subtitle">Project workspace</p>
+        </div>
+        <span className={`api-status${isApiConnected === false ? " is-offline" : ""}`}>
+          <span className="api-status-dot" />
+          API · {isApiConnected === null ? "checking" : isApiConnected ? "connected" : "offline"}
+        </span>
+      </header>
+
+      <section className="content-grid">
+        <div className="intro-copy">
+          <p className="eyebrow accent">Start with a project</p>
+          <h1>Upload a codebase and make it searchable.</h1>
+          <p className="lede">
+            Bring a ZIP archive of your project. Codebase AI will unpack the
+            supported files and prepare them for the workspace.
           </p>
+          <div className="feature-list">
+            <span><b>01</b> ZIP archives up to 50 MB</span>
+            <span><b>02</b> Common source and documentation files</span>
+            <span><b>03</b> Private project workspace per upload</span>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        <div className="upload-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">New project</p>
+              <h2>Project archive</h2>
+            </div>
+            <span className="step-count">1 / 1</span>
+          </div>
+
+          <div
+            className={`drop-zone${isDragging ? " is-dragging" : ""}${selectedFile ? " has-file" : ""}`}
+            onClick={() => inputRef.current?.click()}
+            onDragEnter={(event) => { event.preventDefault(); setIsDragging(true); }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") inputRef.current?.click();
+            }}
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <input ref={inputRef} type="file" accept=".zip,application/zip" onChange={handleFileChange} hidden />
+            <div className="upload-icon">↑</div>
+            {selectedFile ? (
+              <>
+                <strong>{selectedFile.name}</strong>
+                <span>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB ready to upload</span>
+              </>
+            ) : (
+              <>
+                <strong>Drop your ZIP here</strong>
+                <span>or click to browse your files</span>
+              </>
+            )}
+          </div>
+
+          {error && <p className="message error-message">{error}</p>}
+          {result && (
+            <div className="result-box">
+              <div>
+                <span className="success-dot" />
+                <strong>Project uploaded</strong>
+              </div>
+              <p>{result.files_found} supported files found in your project.</p>
+              <code>{result.project_id}</code>
+            </div>
+          )}
+
+          <div className="panel-actions">
+            {selectedFile && <button className="clear-button" type="button" onClick={clearSelection}>Clear</button>}
+            <button className="upload-button" type="button" disabled={!selectedFile || isUploading} onClick={result ? clearSelection : uploadProject}>
+              {isUploading ? "Uploading..." : result ? "Upload another" : "Upload project"}
+            </button>
+          </div>
+          <p className="panel-note">Your archive stays on the local API server.</p>
         </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }
