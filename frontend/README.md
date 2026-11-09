@@ -56,9 +56,6 @@ OLLAMA_HOST=0.0.0.0:11434 ollama serve
 ollama pull qwen3:4b
 ```
 
-For a cloud deployment, see the repository-level
-[DEPLOYMENT.md](../DEPLOYMENT.md).
-
 To configure the Ollama address for Compose without editing tracked files:
 
 ```bash
